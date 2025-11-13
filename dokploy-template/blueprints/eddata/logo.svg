@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#grad1)"/>
+  
+  <!-- Database symbol -->
+  <g fill="#FFFFFF">
+    <!-- Top ellipse -->
+    <ellipse cx="256" cy="150" rx="120" ry="40"/>
+    
+    <!-- Middle section -->
+    <rect x="136" y="150" width="240" height="150" />
+    
+    <!-- Middle ellipse lines -->
+    <ellipse cx="256" cy="225" rx="120" ry="40" fill="none" stroke="#4F46E5" stroke-width="6"/>
+    
+    <!-- Bottom ellipse -->
+    <ellipse cx="256" cy="300" rx="120" ry="40"/>
+  </g>
+  
+  <!-- ED letters -->
+  <g fill="#FFFFFF" font-family="Arial, sans-serif" font-weight="bold" font-size="80">
+    <text x="256" y="390" text-anchor="middle">ED</text>
+  </g>
+</svg>

@@ -1,0 +1,180 @@
+# EDData - Docker Compose für Dokdploy
+# Alle Services für EDData API Plattform
+
+networks:
+  eddata-network:
+    driver: bridge
+
+volumes:
+  eddata-data:
+    driver: local
+  eddata-backup:
+    driver: local
+  eddata-downloads:
+    driver: local
+
+services:
+  # Collector - MUSS als erstes gestartet werden
+  eddata-collector:
+    image: ghcr.io/eddataapi/eddata-collector:latest
+    container_name: eddata-collector
+    restart: unless-stopped
+    networks:
+      - eddata-network
+    volumes:
+      - eddata-data:/app/eddata-data
+      - eddata-backup:/app/eddata-backup
+      - eddata-downloads:/app/eddata-downloads
+    environment:
+      - NODE_ENV=production
+      - EDDN_SERVER=tcp://eddn.edcd.io:9500
+      - EDDATA_DATA_DIR=/app/eddata-data
+      - EDDATA_BACKUP_DIR=/app/eddata-backup
+      - EDDATA_DOWNLOADS_DIR=/app/eddata-downloads
+      - EDDATA_COLLECTOR_LOCAL_PORT=3002
+    ports:
+      - "3002:3002"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.collector.rule=Host(`collector.${EDDATA_DOMAIN:-eddata-api.com}`)"
+      - "traefik.http.routers.collector.entrypoints=websecure"
+      - "traefik.http.routers.collector.tls.certresolver=letsencrypt"
+      - "traefik.http.services.collector.loadbalancer.server.port=3002"
+      # Security Headers
+      - "traefik.http.middlewares.collector-headers.headers.sslredirect=true"
+      - "traefik.http.middlewares.collector-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.collector-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.collector-headers.headers.stsPreload=true"
+      - "traefik.http.routers.collector.middlewares=collector-headers"
+
+  # API - Startet nach Collector
+  eddata-api:
+    image: ghcr.io/eddataapi/eddata-api:latest
+    container_name: eddata-api
+    restart: unless-stopped
+    depends_on:
+      eddata-collector:
+        condition: service_healthy
+    networks:
+      - eddata-network
+    volumes:
+      - eddata-data:/app/eddata-data:ro  # Read-only für API
+      - eddata-backup:/app/eddata-backup:ro
+      - eddata-downloads:/app/eddata-downloads:ro
+    environment:
+      - NODE_ENV=production
+      - EDDATA_API_BASE_URL=https://api.${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_API_LOCAL_PORT=3001
+      - EDDATA_DATA_DIR=/app/eddata-data
+      - EDDATA_CACHE_DIR=/app/eddata-data/cache
+      - EDDATA_BACKUP_DIR=/app/eddata-backup
+      - EDDATA_DOWNLOADS_DIR=/app/eddata-downloads
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/v2/stats', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.${EDDATA_DOMAIN:-eddata-api.com}`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=3001"
+      # Security Headers
+      - "traefik.http.middlewares.api-headers.headers.sslredirect=true"
+      - "traefik.http.middlewares.api-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.api-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.api-headers.headers.stsPreload=true"
+      - "traefik.http.routers.api.middlewares=api-headers"
+
+  # Auth Service
+  eddata-auth:
+    image: ghcr.io/eddataapi/eddata-auth:latest
+    container_name: eddata-auth
+    restart: unless-stopped
+    depends_on:
+      eddata-api:
+        condition: service_healthy
+    networks:
+      - eddata-network
+    volumes:
+      - eddata-data:/app/eddata-data
+    environment:
+      - NODE_ENV=production
+      - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_AUTH_BASE_URL=https://auth.${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_WWW_BASE_URL=https://${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_AUTH_LOCAL_PORT=3003
+      - EDDATA_AUTH_COOKIE_DOMAIN=.${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_DATA_DIR=/app/eddata-data
+      # Security - Diese Werte MÜSSEN über .env gesetzt werden!
+      - EDDATA_SESSION_SECRET=${EDDATA_SESSION_SECRET}
+      - EDDATA_AUTH_JWT_SECRET=${EDDATA_AUTH_JWT_SECRET}
+      - EDDATA_AUTH_CLIENT_ID=${EDDATA_AUTH_CLIENT_ID}
+    ports:
+      - "3003:3003"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=Host(`auth.${EDDATA_DOMAIN:-eddata-api.com}`)"
+      - "traefik.http.routers.auth.entrypoints=websecure"
+      - "traefik.http.routers.auth.tls.certresolver=letsencrypt"
+      - "traefik.http.services.auth.loadbalancer.server.port=3003"
+      # Security Headers
+      - "traefik.http.middlewares.auth-headers.headers.sslredirect=true"
+      - "traefik.http.middlewares.auth-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.auth-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.auth-headers.headers.stsPreload=true"
+      - "traefik.http.routers.auth.middlewares=auth-headers"
+
+  # WWW - Frontend
+  eddata-www:
+    image: ghcr.io/eddataapi/eddata-www:latest
+    container_name: eddata-www
+    restart: unless-stopped
+    depends_on:
+      eddata-api:
+        condition: service_healthy
+      eddata-auth:
+        condition: service_healthy
+    networks:
+      - eddata-network
+    environment:
+      - NODE_ENV=production
+      - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_API_BASE_URL=https://api.${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_AUTH_BASE_URL=https://auth.${EDDATA_DOMAIN:-eddata-api.com}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.www.rule=Host(`${EDDATA_DOMAIN:-eddata-api.com}`) || Host(`www.${EDDATA_DOMAIN:-eddata-api.com}`)"
+      - "traefik.http.routers.www.entrypoints=websecure"
+      - "traefik.http.routers.www.tls.certresolver=letsencrypt"
+      - "traefik.http.services.www.loadbalancer.server.port=3000"
+      # Security Headers
+      - "traefik.http.middlewares.www-headers.headers.sslredirect=true"
+      - "traefik.http.middlewares.www-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.www-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.www-headers.headers.stsPreload=true"
+      - "traefik.http.routers.www.middlewares=www-headers"

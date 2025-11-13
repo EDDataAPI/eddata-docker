@@ -1,0 +1,91 @@
+services:
+  eddata-collector:
+    image: ghcr.io/eddataapi/eddata-collector:latest
+    restart: unless-stopped
+    volumes:
+      - eddata-data:/app/eddata-data
+      - eddata-backup:/app/eddata-backup
+      - eddata-downloads:/app/eddata-downloads
+    environment:
+      - NODE_ENV=production
+      - EDDN_SERVER=tcp://eddn.edcd.io:9500
+      - EDDATA_DATA_DIR=/app/eddata-data
+      - EDDATA_BACKUP_DIR=/app/eddata-backup
+      - EDDATA_DOWNLOADS_DIR=/app/eddata-downloads
+    ports:
+      - 3002
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  eddata-api:
+    image: ghcr.io/eddataapi/eddata-api:latest
+    restart: unless-stopped
+    depends_on:
+      eddata-collector:
+        condition: service_healthy
+    volumes:
+      - eddata-data:/app/eddata-data:ro
+      - eddata-backup:/app/eddata-backup:ro
+      - eddata-downloads:/app/eddata-downloads:ro
+    environment:
+      - NODE_ENV=production
+      - EDDATA_DATA_DIR=/app/eddata-data
+      - EDDATA_CACHE_DIR=/app/eddata-data/cache
+      - EDDATA_BACKUP_DIR=/app/eddata-backup
+      - EDDATA_DOWNLOADS_DIR=/app/eddata-downloads
+    ports:
+      - 3001
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/v2/stats', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  eddata-auth:
+    image: ghcr.io/eddataapi/eddata-auth:latest
+    restart: unless-stopped
+    depends_on:
+      eddata-api:
+        condition: service_healthy
+    volumes:
+      - eddata-data:/app/eddata-data
+    environment:
+      - NODE_ENV=production
+      - EDDATA_DATA_DIR=/app/eddata-data
+    ports:
+      - 3003
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  eddata-www:
+    image: ghcr.io/eddataapi/eddata-www:latest
+    restart: unless-stopped
+    depends_on:
+      eddata-api:
+        condition: service_healthy
+      eddata-auth:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+    ports:
+      - 3000
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  eddata-data:
+  eddata-backup:
+  eddata-downloads:

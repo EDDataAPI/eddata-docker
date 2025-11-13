@@ -1,0 +1,59 @@
+[variables]
+main_domain = "${domain}"
+session_secret = "${password:64}"
+jwt_secret = "${password:64}"
+
+[config]
+
+# Collector - Data collection service (must start first)
+[[config.domains]]
+serviceName = "eddata-collector"
+port = 3002
+host = "collector.${main_domain}"
+
+# API - REST API service
+[[config.domains]]
+serviceName = "eddata-api"
+port = 3001
+host = "api.${main_domain}"
+
+# Auth - Authentication service
+[[config.domains]]
+serviceName = "eddata-auth"
+port = 3003
+host = "auth.${main_domain}"
+
+# WWW - Web frontend
+[[config.domains]]
+serviceName = "eddata-www"
+port = 3000
+host = "${main_domain}"
+
+# Environment variables for API
+[[config.env]]
+serviceName = "eddata-api"
+env = [
+    "EDDATA_API_BASE_URL=https://api.${main_domain}"
+]
+
+# Environment variables for Auth
+[[config.env]]
+serviceName = "eddata-auth"
+env = [
+    "EDDATA_DOMAIN=${main_domain}",
+    "EDDATA_AUTH_BASE_URL=https://auth.${main_domain}",
+    "EDDATA_WWW_BASE_URL=https://${main_domain}",
+    "EDDATA_AUTH_COOKIE_DOMAIN=.${main_domain}",
+    "EDDATA_SESSION_SECRET=${session_secret}",
+    "EDDATA_AUTH_JWT_SECRET=${jwt_secret}",
+    "EDDATA_AUTH_CLIENT_ID=${EDDATA_AUTH_CLIENT_ID}"
+]
+
+# Environment variables for WWW
+[[config.env]]
+serviceName = "eddata-www"
+env = [
+    "EDDATA_DOMAIN=${main_domain}",
+    "EDDATA_API_BASE_URL=https://api.${main_domain}",
+    "EDDATA_AUTH_BASE_URL=https://auth.${main_domain}"
+]

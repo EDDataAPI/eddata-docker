@@ -1,0 +1,20 @@
+[
+  {
+    "id": "eddata",
+    "name": "EDData API Platform",
+    "version": "latest",
+    "description": "Complete Elite Dangerous data platform with real-time EDDN collector, REST API, OAuth authentication, and web frontend.",
+    "logo": "logo.svg",
+    "links": {
+      "github": "https://github.com/EDDataAPI",
+      "website": "https://eddata-api.com",
+      "docs": "https://github.com/EDDataAPI/eddata-api"
+    },
+    "tags": [
+      "database",
+      "api",
+      "gaming",
+      "authentication"
+    ]
+  }
+]
