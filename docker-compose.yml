@@ -1,10 +1,6 @@
 # EDData - Docker Compose für Dokdploy
 # Alle Services für EDData API Plattform
 
-networks:
-  eddata-network:
-    driver: bridge
-
 volumes:
   eddata-data:
     driver: local
@@ -19,8 +15,6 @@ services:
     image: ghcr.io/eddataapi/eddata-collector:latest
     container_name: eddata-collector
     restart: unless-stopped
-    networks:
-      - eddata-network
     volumes:
       - eddata-data:/app/eddata-data
       - eddata-backup:/app/eddata-backup
@@ -61,8 +55,6 @@ services:
     depends_on:
       eddata-collector:
         condition: service_healthy
-    networks:
-      - eddata-network
     volumes:
       - eddata-data:/app/eddata-data:ro  # Read-only für API
       - eddata-backup:/app/eddata-backup:ro
@@ -104,8 +96,6 @@ services:
     depends_on:
       eddata-api:
         condition: service_healthy
-    networks:
-      - eddata-network
     volumes:
       - eddata-data:/app/eddata-data
     environment:
@@ -151,8 +141,6 @@ services:
         condition: service_healthy
       eddata-auth:
         condition: service_healthy
-    networks:
-      - eddata-network
     environment:
       - NODE_ENV=production
       - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata-api.com}
