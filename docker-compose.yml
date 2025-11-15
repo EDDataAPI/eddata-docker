@@ -26,7 +26,7 @@ services:
       - EDDATA_DOWNLOADS_DIR=/app/eddata-downloads
       - EDDATA_COLLECTOR_LOCAL_PORT=3002
     ports:
-      - "3002:3002"
+      - 3002
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
@@ -42,7 +42,7 @@ services:
       eddata-collector:
         condition: service_healthy
     volumes:
-      - eddata-data:/app/eddata-data:ro  # Read-only für API
+      - eddata-data:/app/eddata-data:ro  # Read-only for API
       - eddata-backup:/app/eddata-backup:ro
       - eddata-downloads:/app/eddata-downloads:ro
     environment:
@@ -54,7 +54,7 @@ services:
       - EDDATA_BACKUP_DIR=/app/eddata-backup
       - EDDATA_DOWNLOADS_DIR=/app/eddata-downloads
     ports:
-      - "3001:3001"
+      - 3001
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/v2/stats', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
@@ -84,7 +84,7 @@ services:
       - EDDATA_AUTH_JWT_SECRET=${EDDATA_AUTH_JWT_SECRET}
       - EDDATA_AUTH_CLIENT_ID=${EDDATA_AUTH_CLIENT_ID}
     ports:
-      - "3003:3003"
+      - 3003
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
@@ -107,7 +107,7 @@ services:
       - EDDATA_API_BASE_URL=https://api.${EDDATA_DOMAIN:-eddata-api.com}
       - EDDATA_AUTH_BASE_URL=https://auth.${EDDATA_DOMAIN:-eddata-api.com}
     ports:
-      - "3000:3000"
+      - 3000
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
