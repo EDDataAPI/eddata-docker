@@ -13,6 +13,7 @@ services:
   # Collector - MUSS als erstes gestartet werden
   eddata-collector:
     image: ghcr.io/eddataapi/eddata-collector:latest
+    pull_policy: always
     restart: unless-stopped
     volumes:
       - eddata-data:/app/eddata-data
@@ -37,6 +38,7 @@ services:
   # API - Startet nach Collector
   eddata-api:
     image: ghcr.io/eddataapi/eddata-api:latest
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       eddata-collector:
@@ -65,6 +67,7 @@ services:
   # Auth Service
   eddata-auth:
     image: ghcr.io/eddataapi/eddata-auth:latest
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       eddata-api:
@@ -95,6 +98,7 @@ services:
   # WWW - Frontend
   eddata-www:
     image: ghcr.io/eddataapi/eddata-www:latest
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       eddata-api:
