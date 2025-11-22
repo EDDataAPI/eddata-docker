@@ -1,0 +1,127 @@
+name: Generate Cross-Repo Changelog
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Täglich midnight UTC
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  generate-changelog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Generate aggregated changelog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 << 'EOF'
+          import subprocess
+          import json
+          from datetime import datetime, timedelta
+          from collections import defaultdict
+          
+          repos = [
+              "eddata-collector",
+              "eddata-api",
+              "eddata-auth",
+              "eddata-www"
+          ]
+          
+          org = "EDDataAPI"
+          days_back = 7
+          since_date = (datetime.utcnow() - timedelta(days=days_back)).isoformat() + "Z"
+          
+          # Header
+          changelog = f"""# EDData Stack - Cross-Repository Changelog
+          
+Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}  
+Period: Last {days_back} days
+
+---
+
+"""
+          
+          commits_by_date = defaultdict(list)
+          
+          for repo in repos:
+              try:
+                  # GitHub API für Commits
+                  cmd = f"""gh api repos/{org}/{repo}/commits \
+                    --jq '.[] | {{date: .commit.author.date, message: .commit.message, sha: .sha, author: .commit.author.name}}' \
+                    -f since={since_date}"""
+                  
+                  result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                  
+                  if result.returncode == 0:
+                      for line in result.stdout.strip().split('\n'):
+                          if line:
+                              try:
+                                  commit = json.loads(line)
+                                  commit_date = commit['date'].split('T')[0]
+                                  message = commit['message'].split('\n')[0]
+                                  sha = commit['sha'][:7]
+                                  
+                                  commits_by_date[commit_date].append({
+                                      'repo': repo,
+                                      'message': message,
+                                      'sha': sha,
+                                      'author': commit['author']
+                                  })
+                              except json.JSONDecodeError:
+                                  pass
+              except Exception as e:
+                  print(f"Error processing {repo}: {e}")
+          
+          # Sortieren nach Datum (neueste zuerst)
+          sorted_dates = sorted(commits_by_date.keys(), reverse=True)
+          
+          for date in sorted_dates:
+              changelog += f"## {date}\n\n"
+              
+              # Nach Repository gruppieren
+              by_repo = defaultdict(list)
+              for commit in commits_by_date[date]:
+                  by_repo[commit['repo']].append(commit)
+              
+              for repo in sorted(by_repo.keys()):
+                  changelog += f"### {repo}\n"
+                  for commit in by_repo[repo]:
+                      changelog += f"- {commit['message']} "
+                      changelog += f"[`{commit['sha']}`](https://github.com/{org}/{repo}/commit/{commit['sha']}) "
+                      changelog += f"by {commit['author']}\n"
+                  changelog += "\n"
+          
+          # Datei schreiben
+          with open('AGGREGATED_CHANGELOG.md', 'w') as f:
+              f.write(changelog)
+          
+          print("✅ Aggregated changelog generated")
+          print(f"📝 Included {sum(len(c) for c in commits_by_date.values())} commits from {len(repos)} repositories")
+          
+          EOF
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if git diff --quiet AGGREGATED_CHANGELOG.md; then
+            echo "No changes in changelog"
+          else
+            git add AGGREGATED_CHANGELOG.md
+            git commit -m "chore(changelog): update aggregated changelog"
+            git push
+          fi

@@ -1,0 +1,79 @@
+name: Aggregate Changelog from Service Repos
+
+on:
+  schedule:
+    # Täglich um 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  aggregate-changelog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout eddata-docker
+        uses: actions/checkout@v4
+        with:
+          repository: EDDataAPI/eddata-docker
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get commits from all service repos
+        id: commits
+        run: |
+          # Funktion zum Abrufen von Commits aus einem Repo
+          get_commits() {
+            local repo=$1
+            local days=${2:-7}
+            echo "## $repo" >> /tmp/changelog.md
+            echo "" >> /tmp/changelog.md
+            
+            # GitHub API abfragen für commits der letzten N Tage
+            curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/EDDataAPI/$repo/commits?since=$(date -u -d "$days days ago" '+%Y-%m-%dT%H:%M:%SZ')" \
+              | jq -r '.[] | "- **\(.commit.author.date | split("T")[0])**: \(.commit.message | split("\n")[0]) ([\(.sha[0:7])](https://github.com/EDDataAPI/'$repo'/commit/\(.sha)))"' >> /tmp/changelog.md
+            
+            echo "" >> /tmp/changelog.md
+          }
+          
+          # Header
+          echo "# EDData Stack - Aggregated Changelog (Last 7 Days)" > /tmp/changelog.md
+          echo "" >> /tmp/changelog.md
+          echo "Last updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> /tmp/changelog.md
+          echo "" >> /tmp/changelog.md
+          
+          # Commits aus allen Repos sammeln
+          get_commits "eddata-collector" 7
+          get_commits "eddata-api" 7
+          get_commits "eddata-auth" 7
+          get_commits "eddata-www" 7
+          
+          # Ausgabe in Variable speichern
+          cat /tmp/changelog.md
+
+      - name: Update AGGREGATED_CHANGELOG.md
+        run: |
+          # Aggregierter Changelog ersetzen oder erstellen
+          cp /tmp/changelog.md AGGREGATED_CHANGELOG.md
+
+      - name: Create Pull Request if changes
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore(changelog): update aggregated changelog from service repos'
+          title: 'chore: update aggregated changelog'
+          body: |
+            Automated changelog aggregation from:
+            - EDDataAPI/eddata-collector
+            - EDDataAPI/eddata-api
+            - EDDataAPI/eddata-auth
+            - EDDataAPI/eddata-www
+            
+            Last 7 days of commits included.
+          branch: chore/update-changelog
+          delete-branch: true
