@@ -23,6 +23,7 @@ services:
       - NODE_ENV=production
       - EDDN_SERVER=tcp://eddn.edcd.io:9500
       - EDDATA_DATA_DIR=/app/eddata-data
+      - EDDATA_CACHE_DIR=/app/eddata-data/cache
       - EDDATA_BACKUP_DIR=/app/eddata-backup
       - EDDATA_DOWNLOADS_DIR=/app/eddata-downloads
       - EDDATA_COLLECTOR_LOCAL_PORT=3002
@@ -44,7 +45,7 @@ services:
       eddata-collector:
         condition: service_healthy
     volumes:
-      - eddata-data:/app/eddata-data:ro  # Read-only for API
+      - eddata-data:/app/eddata-data:ro
       - eddata-backup:/app/eddata-backup:ro
       - eddata-downloads:/app/eddata-downloads:ro
     environment:
@@ -74,6 +75,8 @@ services:
         condition: service_healthy
     volumes:
       - eddata-data:/app/eddata-data
+      - eddata-backup:/app/eddata-backup
+      - eddata-downloads:/app/eddata-downloads
     environment:
       - NODE_ENV=production
       - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata-api.com}
@@ -82,6 +85,7 @@ services:
       - EDDATA_AUTH_LOCAL_PORT=3003
       - EDDATA_AUTH_COOKIE_DOMAIN=.${EDDATA_DOMAIN:-eddata-api.com}
       - EDDATA_DATA_DIR=/app/eddata-data
+      - EDDATA_CACHE_DIR=/app/eddata-data/cache
       # Security - Diese Werte MÜSSEN über .env gesetzt werden!
       - EDDATA_SESSION_SECRET=${EDDATA_SESSION_SECRET}
       - EDDATA_AUTH_JWT_SECRET=${EDDATA_AUTH_JWT_SECRET}
@@ -110,6 +114,7 @@ services:
       - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata-api.com}
       - EDDATA_API_BASE_URL=https://api.${EDDATA_DOMAIN:-eddata-api.com}
       - EDDATA_AUTH_BASE_URL=https://auth.${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_CACHE_DIR=/app/eddata-data/cache
     ports:
       - 3000
     healthcheck:
