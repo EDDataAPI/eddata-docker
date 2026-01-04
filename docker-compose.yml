@@ -27,6 +27,36 @@ services:
       - EDDATA_BACKUP_DIR=/app/eddata-backup
       - EDDATA_DOWNLOADS_DIR=/app/eddata-downloads
       - EDDATA_COLLECTOR_LOCAL_PORT=3002
+      # Maintenance settings
+      - MAINTENANCE_DAY_OF_WEEK=${MAINTENANCE_DAY_OF_WEEK:-0}
+      - MAINTENANCE_WINDOW_START_HOUR=${MAINTENANCE_WINDOW_START_HOUR:-2}
+      - MAINTENANCE_WINDOW_END_HOUR=${MAINTENANCE_WINDOW_END_HOUR:-6}
+      # Performance: Skip startup maintenance for faster restarts (default: false)
+      # Set to 'true' only if cache files exist and snapshots are managed via cron
+      - SKIP_STARTUP_MAINTENANCE=${SKIP_STARTUP_MAINTENANCE:-false}
+      # Performance: Skip slow regional commodity reports (Core Systems, Colonia)
+      # These take 5-10 minutes and are rarely used - skip them to speed up stats by 80%
+      - SKIP_REGIONAL_COMMODITY_REPORTS=${SKIP_REGIONAL_COMMODITY_REPORTS:-true}
+      # Performance: Skip expensive index creation on startup (first run only)
+      # New indexes are created in background - prevents 5-10 min startup delay
+      - SKIP_EXPENSIVE_INDEXES=${SKIP_EXPENSIVE_INDEXES:-false}
+      # Performance: Skip database integrity checks on startup
+      # Only needed after crashes/corruption - saves 2-5 minutes for large DBs
+      - SKIP_INTEGRITY_CHECKS=${SKIP_INTEGRITY_CHECKS:-true}
+      # Performance optimizations
+      - NODE_OPTIONS=--max-old-space-size=4096
+      - UV_THREADPOOL_SIZE=16
+      # SQLite optimization: 2GB cache for 7.4GB database (server has 8GB RAM total!)
+      # Memory distribution: 1.5GB Node.js + 2GB SQLite + 2GB OS Cache + 0.5GB overhead
+    # Resource limits for production deployment (server has 8GB RAM total)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 6G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
     ports:
       - 3002
     healthcheck:
