@@ -19,7 +19,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 1h
 
   eddata-api:
     image: ghcr.io/eddataapi/eddata-api:latest
@@ -44,7 +44,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 1h
 
   eddata-auth:
     image: ghcr.io/eddataapi/eddata-auth:latest
@@ -64,7 +64,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 1h
 
   eddata-www:
     image: ghcr.io/eddataapi/eddata-www:latest
@@ -83,7 +83,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 1h
 
 volumes:
   eddata-data:
