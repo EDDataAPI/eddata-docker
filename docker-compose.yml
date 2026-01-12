@@ -99,6 +99,9 @@ services:
       - EDDATA_CACHE_DIR=/app/eddata-data/cache
       - EDDATA_BACKUP_DIR=/app/eddata-backup
       - EDDATA_DOWNLOADS_DIR=/app/eddata-downloads
+      # Collector connection for stats refresh
+      - EDDATA_COLLECTOR_HOST=eddata-collector
+      - EDDATA_COLLECTOR_LOCAL_PORT=3002
     ports:
       - 3001
     healthcheck:
