@@ -21,18 +21,25 @@ services:
       - eddata-downloads:/app/eddata-downloads
     environment:
       - NODE_ENV=production
-      - EDDN_SERVER=tcp://eddn.edcd.io:9500
+      - EDDN_SERVER=${EDDN_SERVER:-tcp://eddn.edcd.io:9500}
+      - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata.dev}
+      - EDDATA_DOWNLOADS_BASE_URL=${EDDATA_DOWNLOADS_BASE_URL}
       - EDDATA_DATA_DIR=/app/eddata-data
       - EDDATA_CACHE_DIR=/app/eddata-data/cache
       - EDDATA_BACKUP_DIR=/app/eddata-backup
       - EDDATA_DOWNLOADS_DIR=/app/eddata-downloads
       - EDDATA_COLLECTOR_LOCAL_PORT=3002
+      # Database settings
+      - EDDATA_SYSTEMS_DB=/app/eddata-data/systems.db
+      - EDDATA_LOCATIONS_DB=/app/eddata-data/locations.db
+      - EDDATA_STATIONS_DB=/app/eddata-data/stations.db
+      - EDDATA_TRADE_DB=/app/eddata-data/trade.db
       # Maintenance settings
       - MAINTENANCE_DAY_OF_WEEK=${MAINTENANCE_DAY_OF_WEEK:-0}
       - MAINTENANCE_WINDOW_START_HOUR=${MAINTENANCE_WINDOW_START_HOUR:-2}
       - MAINTENANCE_WINDOW_END_HOUR=${MAINTENANCE_WINDOW_END_HOUR:-6}
       # Performance: Skip startup maintenance for faster restarts (default: false)
-      # Set to 'true' only if cache files exist and snapshots are managed via cron
+      # Snapshots and stats take 10-20 minutes with large DBs - better to run via cron
       - SKIP_STARTUP_MAINTENANCE=${SKIP_STARTUP_MAINTENANCE:-false}
       # Performance: Skip slow regional commodity reports (Core Systems, Colonia)
       # These take 5-10 minutes and are rarely used - skip them to speed up stats by 80%
@@ -45,26 +52,27 @@ services:
       - SKIP_INTEGRITY_CHECKS=${SKIP_INTEGRITY_CHECKS:-true}
       # Performance: Skip trade.db snapshots to prevent OOM kills
       # trade.db is 7GB+ and requires significant RAM for snapshotting
-      # Set to 'true' on servers with <16GB RAM (default: true for 8GB server)
-      - SKIP_TRADE_DB_SNAPSHOTS=${SKIP_TRADE_DB_SNAPSHOTS:-true}
+      # Set to 'true' on servers with <16GB RAM (default: false for 12GB server)
+      - SKIP_TRADE_DB_SNAPSHOTS=${SKIP_TRADE_DB_SNAPSHOTS:-false}
       # Performance optimizations
-      - NODE_OPTIONS=--max-old-space-size=4096
+      - NODE_OPTIONS=--max-old-space-size=6144
       - UV_THREADPOOL_SIZE=16
-      # SQLite optimization: 2GB cache for 7.4GB database (server has 8GB RAM total!)
-      # Memory distribution: 1.5GB Node.js + 2GB SQLite + 2GB OS Cache + 0.5GB overhead
-    # Resource limits for production deployment (server has 8GB RAM total)
+      # SQLite optimization: 3GB cache for ~5GB database (server has 12GB RAM total)
+      # Memory distribution: 2.5GB Node.js + 3GB SQLite + 3GB OS Cache + 1GB overhead
+      # Database cleaned: 7.5GB → 5GB after 30-day retention cleanup + VACUUM
+    # Resource limits for production deployment (server has 12GB RAM total)
     deploy:
       resources:
         limits:
           cpus: '2.0'
-          memory: 6G
+          memory: 10G
         reservations:
           cpus: '1.0'
-          memory: 2G
+          memory: 3G
     ports:
       - 3002
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      test: ["CMD", "node", "-e", "const http = require('http'); const options = { hostname: 'localhost', port: 3002, path: '/health', timeout: 5000 }; const req = http.request(options, (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }); req.on('error', () => process.exit(1)); req.on('timeout', () => process.exit(1)); req.end();"]
       interval: 60s
       timeout: 30s
       retries: 5
@@ -84,7 +92,8 @@ services:
       - eddata-downloads:/app/eddata-downloads:ro
     environment:
       - NODE_ENV=production
-      - EDDATA_API_BASE_URL=https://api.${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata.dev}
+      - EDDATA_API_BASE_URL=${EDDATA_API_BASE_URL:-https://api.${EDDATA_DOMAIN:-eddata.dev}}
       - EDDATA_API_LOCAL_PORT=3001
       - EDDATA_DATA_DIR=/app/eddata-data
       - EDDATA_CACHE_DIR=/app/eddata-data/cache
@@ -113,13 +122,14 @@ services:
       - eddata-downloads:/app/eddata-downloads
     environment:
       - NODE_ENV=production
-      - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata-api.com}
-      - EDDATA_AUTH_BASE_URL=https://auth.${EDDATA_DOMAIN:-eddata-api.com}
-      - EDDATA_WWW_BASE_URL=https://${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata.dev}
+      - EDDATA_AUTH_BASE_URL=${EDDATA_AUTH_BASE_URL:-https://auth.${EDDATA_DOMAIN:-eddata.dev}}
+      - EDDATA_WWW_BASE_URL=${EDDATA_WWW_BASE_URL:-https://${EDDATA_DOMAIN:-eddata.dev}}
       - EDDATA_AUTH_LOCAL_PORT=3003
-      - EDDATA_AUTH_COOKIE_DOMAIN=.${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_AUTH_COOKIE_DOMAIN=${EDDATA_AUTH_COOKIE_DOMAIN:-.${EDDATA_DOMAIN:-eddata.dev}}
       - EDDATA_DATA_DIR=/app/eddata-data
       - EDDATA_CACHE_DIR=/app/eddata-data/cache
+      - EDDATA_BACKUP_DIR=/app/eddata-backup
       # Security - Diese Werte MÜSSEN über .env gesetzt werden!
       - EDDATA_SESSION_SECRET=${EDDATA_SESSION_SECRET}
       - EDDATA_AUTH_JWT_SECRET=${EDDATA_AUTH_JWT_SECRET}
@@ -145,14 +155,14 @@ services:
         condition: service_healthy
     environment:
       - NODE_ENV=production
-      - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata-api.com}
-      - EDDATA_API_BASE_URL=https://api.${EDDATA_DOMAIN:-eddata-api.com}
-      - EDDATA_AUTH_BASE_URL=https://auth.${EDDATA_DOMAIN:-eddata-api.com}
+      - EDDATA_DOMAIN=${EDDATA_DOMAIN:-eddata.dev}
+      - EDDATA_API_BASE_URL=${EDDATA_API_BASE_URL:-https://api.${EDDATA_DOMAIN:-eddata.dev}}
+      - EDDATA_AUTH_BASE_URL=${EDDATA_AUTH_BASE_URL:-https://auth.${EDDATA_DOMAIN:-eddata.dev}}
       - EDDATA_CACHE_DIR=/app/eddata-data/cache
     ports:
       - 3000
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
       timeout: 10s
       retries: 3
